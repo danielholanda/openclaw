@@ -11,7 +11,7 @@ title: "Lemonade"
 
 [Lemonade Server](https://lemonade-server.ai/) is a local AI server that provides an OpenAI-compatible HTTP API. It supports multiple backends (llama.cpp, ONNX Runtime GenAI, FastFlowLM, whisper.cpp, stable-diffusion.cpp) and can accelerate inference using CPU, GPU, and NPU hardware.
 
-OpenClaw connects to Lemonade using the `openai-completions` API and can **auto-discover** available models.
+OpenClaw connects to Lemonade using the `openai-completions` API and **auto-discovers** available models when the server is running — no API key or extra configuration required.
 
 ## Quick start
 
@@ -23,13 +23,7 @@ lemonade-server serve
 
 The server runs on `http://127.0.0.1:8000` by default, with OpenAI-compatible endpoints at `/api/v1/`.
 
-2. Opt in (any value works since Lemonade does not enforce auth by default):
-
-```bash
-export LEMONADE_API_KEY="lemonade-local"
-```
-
-3. Select a model (replace with one of your Lemonade model IDs from `GET /api/v1/models`):
+2. Select a model (replace with one of your Lemonade model IDs from `GET /api/v1/models`):
 
 ```json5
 {
@@ -41,15 +35,17 @@ export LEMONADE_API_KEY="lemonade-local"
 }
 ```
 
+That's it. OpenClaw will automatically discover models from the running Lemonade Server.
+
 ## Model discovery (implicit provider)
 
-When `LEMONADE_API_KEY` is set (or an auth profile exists) and you **do not** define `models.providers.lemonade`, OpenClaw will query:
+When Lemonade Server is running and you **do not** define `models.providers.lemonade`, OpenClaw will automatically query:
 
 - `GET http://127.0.0.1:8000/api/v1/models`
 
-...and convert the returned IDs into model entries.
+...and register the returned models. No `LEMONADE_API_KEY` is needed — the server does not enforce auth by default.
 
-If you set `models.providers.lemonade` explicitly, auto-discovery is skipped and you must define models manually.
+If you set `models.providers.lemonade` explicitly with models, auto-discovery is skipped and only your manually defined models are used.
 
 ## Explicit configuration (manual models)
 
@@ -65,7 +61,6 @@ Use explicit config when:
     providers: {
       lemonade: {
         baseUrl: "http://127.0.0.1:8000/api/v1",
-        apiKey: "${LEMONADE_API_KEY}",
         api: "openai-completions",
         models: [
           {
@@ -83,6 +78,8 @@ Use explicit config when:
   },
 }
 ```
+
+If your server requires authentication, add `apiKey: "${LEMONADE_API_KEY}"` to the provider block and set the env var accordingly.
 
 ## Supported backends
 
@@ -112,4 +109,4 @@ curl http://127.0.0.1:8000/api/v1/models
 
 - If models are not appearing, make sure they are downloaded via the Lemonade web app (`http://localhost:8000`) or the `/api/v1/pull` endpoint.
 
-- If requests fail with auth errors, set a real `LEMONADE_API_KEY` that matches your server configuration, or configure the provider explicitly under `models.providers.lemonade`.
+- If your server is configured with authentication, set `LEMONADE_API_KEY` or configure the provider explicitly under `models.providers.lemonade`.

@@ -8,9 +8,11 @@ import {
   definePluginEntry,
   type OpenClawPluginApi,
   type ProviderAuthMethodNonInteractiveContext,
+  type ProviderDiscoveryContext,
 } from "openclaw/plugin-sdk/plugin-entry";
 
 const PROVIDER_ID = "lemonade";
+const DEFAULT_API_KEY = "lemonade-local";
 
 async function loadProviderSetup() {
   return await import("openclaw/plugin-sdk/self-hosted-provider-setup");
@@ -59,13 +61,38 @@ export default definePluginEntry({
       ],
       discovery: {
         order: "late",
-        run: async (ctx) => {
+        run: async (ctx: ProviderDiscoveryContext) => {
+          const explicit = ctx.config.models?.providers?.lemonade;
+          const hasExplicitModels = Array.isArray(explicit?.models) && explicit.models.length > 0;
+          const lemonadeKey = ctx.resolveProviderApiKey(PROVIDER_ID).apiKey;
+
+          if (hasExplicitModels && explicit) {
+            return {
+              provider: {
+                ...explicit,
+                baseUrl:
+                  typeof explicit.baseUrl === "string" && explicit.baseUrl.trim()
+                    ? explicit.baseUrl.trim().replace(/\/+$/, "")
+                    : LEMONADE_DEFAULT_BASE_URL,
+                api: explicit.api ?? "openai-completions",
+                apiKey: lemonadeKey ?? explicit.apiKey ?? DEFAULT_API_KEY,
+              },
+            };
+          }
+
           const providerSetup = await loadProviderSetup();
-          return await providerSetup.discoverOpenAICompatibleSelfHostedProvider({
-            ctx,
-            providerId: PROVIDER_ID,
-            buildProvider: providerSetup.buildLemonadeProvider,
+          const provider = await providerSetup.buildLemonadeProvider({
+            baseUrl: explicit?.baseUrl,
           });
+          if (provider.models.length === 0 && !lemonadeKey && !explicit) {
+            return null;
+          }
+          return {
+            provider: {
+              ...provider,
+              apiKey: lemonadeKey ?? explicit?.apiKey ?? DEFAULT_API_KEY,
+            },
+          };
         },
       },
       wizard: {
